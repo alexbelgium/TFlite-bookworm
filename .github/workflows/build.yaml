@@ -98,7 +98,7 @@ jobs:
             TARGET_ARCH="aarch64"
             apt-get install -y libicu70
           else
-            CUSTOM_BAZEL_FLAGS+=" --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1 "
+            CUSTOM_BAZEL_FLAGS+=" --copt=-mno-avx --copt=-mno-avx2" # --copt=-msse4.2 --copt=-msse4.1 "
             CUSTOM_BAZEL_FLAGS+="--copt=-Wno-gnu-offsetof-extensions "
             TARGET_ARCH="native"
           fi

@@ -51,11 +51,6 @@ jobs:
           ln -sf /usr/bin/clang-17 /usr/bin/clang
           echo "Clang version is $(clang-17 --version)"
           
-          # Bazel
-          source tensorflow/tools/ci_build/release/common.sh
-          install_bazelisk
-          which bazel
-
           # Python
           echo "Building TFLite Runtime for ${{ matrix.arch }} / Python ${{ matrix.python }}"
           apt-get update
@@ -107,7 +102,7 @@ jobs:
           export CC=clang-17
           export CXX=clang++-17
           # Insert a 'bazel clean --expunge' call before the script's normal Bazel commands
-          sed -i "/^bazel/i\bazel clean --expunge" tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh
+          sed -i "/^bazel/i\bazel clean --expunge || true" tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh
           chmod +x tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh
           ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh "$TARGET_ARCH"
 

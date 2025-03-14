@@ -166,6 +166,7 @@ jobs:
               -R "${{ github.repository }}" \
               --title "tflite_runtime ${{ env.TFLITE_VERSION }}" \
               --notes "Automated build for tflite_runtime ${{ env.TFLITE_VERSION }}"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

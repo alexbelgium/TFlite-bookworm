@@ -60,10 +60,6 @@ jobs:
       - name: Configure arm64 Repositories
         if: matrix.arch == 'aarch64'
         run: |
-          apt-get update && apt-get install -y lsb-release
-          if command -v lsb_release >/dev/null; then
-            [[ "$(lsb_release -si)" == "Debian" ]] || exit 0
-          fi
           sed -i "s/deb\ /deb \[arch=amd64\]\ /g" /etc/apt/sources.list
 
       - name: Build TFLite Runtime Wheel using Docker

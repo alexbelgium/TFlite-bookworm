@@ -15,7 +15,7 @@ jobs:
       image: debian:bookworm
     strategy:
       matrix:
-        python_version: ["3.11"]
+        python: ["3.11"]
         arch: ["x86_64"]
 
     steps:

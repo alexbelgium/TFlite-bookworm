@@ -1,0 +1,160 @@
+name: Build TFLite Runtime Wheels
+
+on:
+  workflow_dispatch:
+  push:
+
+env:
+  TFLITE_VERSION: "2.17.1"
+  BASE_IMAGE: "debian:bookworm"
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    container:
+      image: debian:bookworm
+    strategy:
+      matrix:
+        python_version: ["3.11"]
+        arch: ["x86_64"]
+    steps:
+      - name: Checkout TensorFlow
+        uses: actions/checkout@v4
+        with:
+          repository: tensorflow/tensorflow
+          submodules: true
+          fetch-depth: 0
+          ref: v${{ env.TFLITE_VERSION }}
+
+      - name: Setup Dependencies
+        run: |
+          apt-get update
+          apt-get remove -y llvm*
+          apt-get install -y build-essential lld git zip unzip pkg-config curl gcc wget
+          wget -qO- https://apt.llvm.org/llvm.sh | bash -s -- 17
+          ln -sf /usr/bin/clang-17 /usr/bin/clang
+          echo "Clang version is $(clang-17 --version)"
+
+      - name: Install Python
+        shell: bash
+        run: |
+          set -xe
+          echo "Building TFLite Runtime for ${{ matrix.arch }} / Python ${{ matrix.python_version }}"
+          # Debian Bookworm already includes Python 3.11. Adjust package names if necessary.
+          apt-get update
+          apt-get install -y \
+            python${{ matrix.python_version }} \
+            python${{ matrix.python_version }}-dev \
+            python${{ matrix.python_version }}-venv \
+            python3-pip \
+            build-essential lld git zip unzip pkg-config curl
+          python${{ matrix.python_version }} -m venv /tmp/tflite_env
+          source /tmp/tflite_env/bin/activate
+          pip install --upgrade pip wheel numpy==1.26.4 auditwheel setuptools
+
+      - name: Configure arm64 Repositories
+        if: matrix.arch == 'aarch64'
+        run: |
+          # Optionally install lsb-release if not already installed.
+          apt-get update && apt-get install -y lsb-release
+          if command -v lsb_release >/dev/null; then
+            [[ "$(lsb_release -si)" == "Debian" ]] || exit 0
+          fi
+          sed -i "s/deb\ /deb \[arch=amd64\]\ /g" /etc/apt/sources.list
+          # Add additional Debian-specific repository configuration here if required.
+          echo "Configured arm64 repositories for Debian (if necessary)."
+
+      - name: Build TFLite Runtime Wheel using Docker
+        shell: bash    
+        run: |
+          set -xe
+          source /tmp/tflite_env/bin/activate
+          python --version        
+          export PYTHON_VERSION="${{ matrix.python_version }}"
+          export TF_PYTHON_VERSION="$PYTHON_VERSION"
+          export NUMPY_VERSION="1.24.4"
+          export TENSORFLOW_TARGET="${{ matrix.arch }}"
+          CUSTOM_BAZEL_FLAGS="--define=tflite_pip_with_xnnpack=true --define=tflite_pip_with_xnnpack_reshaping=true "
+          CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_flex=true "
+          CUSTOM_BAZEL_FLAGS+="--define xnnpack_force_float_precision=fp16 "
+          CUSTOM_BAZEL_FLAGS+="--define=no_tensorflow_py_deps=true --strip=always "
+          CUSTOM_BAZEL_FLAGS+="--features=-layering_check "
+          if [[ "${{ matrix.arch }}" == "aarch64" ]]; then
+            TARGET_ARCH="aarch64"
+            apt-get install -y libicu70
+          else
+            CUSTOM_BAZEL_FLAGS+=" --copt=-mno-avx --copt=-mno-avx2 --copt=-msse4.2 --copt=-msse4.1 "
+            CUSTOM_BAZEL_FLAGS+="--copt=-Wno-gnu-offsetof-extensions "
+            TARGET_ARCH="native"
+          fi
+          export CUSTOM_BAZEL_FLAGS
+          export TF_PYTHON_VERSION="${{ matrix.python_version }}"
+          export CC=clang-17
+          export CXX=clang++-17
+          sed -i "/^bazel/i\bazel clean --expunge" tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh
+          chmod +x tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh
+          ./tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh "$TARGET_ARCH"
+
+      - name: Prepare Wheel for Upload
+        run: |
+          mkdir -p /home/runner/work/wheels
+          WHEEL_PATH=$(find tensorflow/lite/tools/pip_package/gen/tflite_pip/python3/dist -name "*.whl" | head -n 1)
+          if [[ -z "$WHEEL_PATH" ]]; then
+            echo "Error: No wheel file found!"
+            exit 1
+          fi
+          echo "PY_TAG=$(echo ${{ matrix.python_version }} | sed 's/\.//g')" >> $GITHUB_ENV
+          NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.TFLITE_VERSION }}-cp${{ env.PY_TAG }}-cp${{ env.PY_TAG }}-linux_${{ matrix.arch }}.whl"
+          mv "$WHEEL_PATH" "$NEW_WHEEL_PATH"
+          echo "Wheel created: $NEW_WHEEL_PATH"
+
+      - name: List Built Wheels
+        run: ls -l /home/runner/work/wheels
+
+      - name: Verify Wheel Architectures
+        run: file /home/runner/work/wheels/*.whl
+
+      - name: Upload Wheel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tflite_runtime-${{ env.TFLITE_VERSION }}-cp${{ env.PY_TAG }}-cp${{ env.PY_TAG }}-linux_${{ matrix.arch }}
+          path: /home/runner/work/wheels/*.whl
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: wheels
+
+      - name: List Downloaded Wheels
+        run: find wheels
+
+      - name: Authenticate GitHub CLI
+        run: gh auth status
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release (if not exists)
+        run: |
+          if gh release view ${{ env.TFLITE_VERSION }} -R "${{ github.repository }}" > /dev/null 2>&1; then
+            echo "Release already exists. Skipping creation."
+          else
+            gh release create ${{ env.TFLITE_VERSION }} \
+              -R "${{ github.repository }}" \
+              --title "tflite_runtime ${{ env.TFLITE_VERSION }}" \
+              --notes "Automated build for tflite_runtime ${{ env.TFLITE_VERSION }}"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Wheels to GitHub Release
+        run: |
+          gh release upload ${{ env.TFLITE_VERSION }} wheels/**/*.whl --clobber -R "${{ github.repository }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -33,26 +33,30 @@ jobs:
           fetch-depth: 0
           ref: v${{ env.TFLITE_VERSION }}
 
+      - name: Configure Git Safe Directory
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: Setup Dependencies
         run: |
+          set -xe
+          
           apt-get update
           apt-get remove -y llvm*
           apt-get install -y polkitd build-essential lld git zip unzip pkg-config curl gcc wget
+
+          # LVVM
           wget -qO- https://apt.llvm.org/llvm.sh | bash -s -- 17
           ln -sf /usr/bin/clang-17 /usr/bin/clang
           echo "Clang version is $(clang-17 --version)"
-
-      - name: Install Bazel
-        run: |
+          
+          # Bazel
           USE_BAZEL_VERSION="6.5.0"
           wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -O /usr/bin/bazel
           chmod a+x /usr/bin/bazel
           bazel version
 
-      - name: Install Python
-        shell: bash
-        run: |
-          set -xe
+          # Python
           echo "Building TFLite Runtime for ${{ matrix.arch }} / Python ${{ matrix.python_version }}"
           apt-get update
           apt-get install -y \

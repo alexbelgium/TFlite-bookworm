@@ -18,6 +18,12 @@ jobs:
         python_version: ["3.11"]
         arch: ["x86_64"]
     steps:
+      - name: Install Git
+        run: |
+          apt-get update
+          apt-get install -y git
+          git --version
+
       - name: Checkout TensorFlow
         uses: actions/checkout@v4
         with:
@@ -40,7 +46,6 @@ jobs:
         run: |
           set -xe
           echo "Building TFLite Runtime for ${{ matrix.arch }} / Python ${{ matrix.python_version }}"
-          # Debian Bookworm already includes Python 3.11. Adjust package names if necessary.
           apt-get update
           apt-get install -y \
             python${{ matrix.python_version }} \
@@ -55,14 +60,11 @@ jobs:
       - name: Configure arm64 Repositories
         if: matrix.arch == 'aarch64'
         run: |
-          # Optionally install lsb-release if not already installed.
           apt-get update && apt-get install -y lsb-release
           if command -v lsb_release >/dev/null; then
             [[ "$(lsb_release -si)" == "Debian" ]] || exit 0
           fi
           sed -i "s/deb\ /deb \[arch=amd64\]\ /g" /etc/apt/sources.list
-          # Add additional Debian-specific repository configuration here if required.
-          echo "Configured arm64 repositories for Debian (if necessary)."
 
       - name: Build TFLite Runtime Wheel using Docker
         shell: bash    
@@ -149,7 +151,6 @@ jobs:
               -R "${{ github.repository }}" \
               --title "tflite_runtime ${{ env.TFLITE_VERSION }}" \
               --notes "Automated build for tflite_runtime ${{ env.TFLITE_VERSION }}"
-          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

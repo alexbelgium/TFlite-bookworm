@@ -57,12 +57,12 @@ jobs:
           chmod a+x /usr/bin/bazel
 
           # Python
-          echo "Building TFLite Runtime for ${{ matrix.arch }} / Python ${{ matrix.python_version }}"
+          echo "Building TFLite Runtime for ${{ matrix.arch }} / Python ${{ matrix.python }}"
           apt-get update
           apt-get install -y \
-            python${{ matrix.python_version }} \
-            python${{ matrix.python_version }}-dev \
-            python${{ matrix.python_version }}-venv \
+            python${{ matrix.python }} \
+            python${{ matrix.python }}-dev \
+            python${{ matrix.python }}-venv \
             python3-pip \
             build-essential lld git zip unzip pkg-config curl
           python3 -m venv /tmp/tflite_env
@@ -85,14 +85,14 @@ jobs:
           set -xe
           source /tmp/tflite_env/bin/activate
           python --version        
-          export PYTHON_VERSION="${{ matrix.python_version }}"
+          export PYTHON_VERSION="${{ matrix.python }}"
           export TF_PYTHON_VERSION="$PYTHON_VERSION"
           export NUMPY_VERSION="1.24.4"
           export TENSORFLOW_TARGET="${{ matrix.arch }}"
           CUSTOM_BAZEL_FLAGS="--define=tflite_pip_with_xnnpack=true --define=tflite_pip_with_xnnpack_reshaping=true "
           CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_flex=true "
           CUSTOM_BAZEL_FLAGS+="--define xnnpack_force_float_precision=fp16 "
-          CUSTOM_BAZEL_FLAGS+="--define=no_tensorflow_py_deps=true --strip=always "
+          CUSTOM_BAZEL_FLAGS+="--linkopt=-flto --copt=-flto --define=no_tensorflow_py_deps=true --strip=always "
           CUSTOM_BAZEL_FLAGS+="--features=-layering_check "
           if [[ "${{ matrix.arch }}" == "aarch64" ]]; then
             TARGET_ARCH="aarch64"
@@ -103,7 +103,7 @@ jobs:
             TARGET_ARCH="native"
           fi
           export CUSTOM_BAZEL_FLAGS
-          export TF_PYTHON_VERSION="${{ matrix.python_version }}"
+          export TF_PYTHON_VERSION="${{ matrix.python }}"
           export CC=clang-17
           export CXX=clang++-17
           # Insert a 'bazel clean --expunge' call before the script's normal Bazel commands
@@ -119,8 +119,9 @@ jobs:
             echo "Error: No wheel file found!"
             exit 1
           fi
-          echo "PY_TAG=$(echo ${{ matrix.python_version }} | sed 's/\.//g')" >> $GITHUB_ENV
-          NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.TFLITE_VERSION }}-cp${{ env.PY_TAG }}-cp${{ env.PY_TAG }}-linux_${{ matrix.arch }}.whl"
+          PY_TAG=$(echo ${{ matrix.python }} | sed 's/\.//g')
+          echo "PY_TAG=$PY_TAG" >> $GITHUB_ENV
+          NEW_WHEEL_PATH="/home/runner/work/wheels/tflite_runtime-${{ env.TFLITE_VERSION }}-cp${PY_TAG}-cp${PY_TAG}-linux_${{ matrix.arch }}.whl"
           mv "$WHEEL_PATH" "$NEW_WHEEL_PATH"
           echo "Wheel created: $NEW_WHEEL_PATH"
 

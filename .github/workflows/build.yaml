@@ -55,7 +55,6 @@ jobs:
           USE_BAZEL_VERSION="6.5.0"
           wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -O /usr/bin/bazel
           chmod a+x /usr/bin/bazel
-          bazel version
 
           # Python
           echo "Building TFLite Runtime for ${{ matrix.arch }} / Python ${{ matrix.python_version }}"

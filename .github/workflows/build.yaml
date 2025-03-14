@@ -51,6 +51,10 @@ jobs:
           ln -sf /usr/bin/clang-17 /usr/bin/clang
           echo "Clang version is $(clang-17 --version)"
           
+          # Bazel installation
+          wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.1.0/bazelisk-linux-amd64 -O /usr/bin/bazel
+          chmod a+x /usr/bin/bazel
+
           # Python
           echo "Building TFLite Runtime for ${{ matrix.arch }} / Python ${{ matrix.python }}"
           apt-get update

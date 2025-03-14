@@ -36,7 +36,7 @@ jobs:
         run: |
           apt-get update
           apt-get remove -y llvm*
-          apt-get install -y build-essential lld git zip unzip pkg-config curl gcc wget
+          apt-get install -y polkitd build-essential lld git zip unzip pkg-config curl gcc wget
           wget -qO- https://apt.llvm.org/llvm.sh | bash -s -- 17
           ln -sf /usr/bin/clang-17 /usr/bin/clang
           echo "Clang version is $(clang-17 --version)"

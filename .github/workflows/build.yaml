@@ -21,7 +21,7 @@ jobs:
       - name: Install Git
         run: |
           apt-get update
-          apt-get install -y git lsb-release
+          apt-get install -y git lsb-release wget software-properties-common gnupg
           git --version
 
       - name: Checkout TensorFlow

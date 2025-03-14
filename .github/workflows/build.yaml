@@ -100,7 +100,7 @@ jobs:
           else
             CUSTOM_BAZEL_FLAGS+=" --copt=-mno-avx --copt=-mno-avx2 "
             CUSTOM_BAZEL_FLAGS+="--copt=-Wno-gnu-offsetof-extensions "
-            TARGET_ARCH="native"
+            TARGET_ARCH=""
           fi
           export CUSTOM_BAZEL_FLAGS
           export TF_PYTHON_VERSION="${{ matrix.python }}"

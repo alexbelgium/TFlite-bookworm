@@ -19,10 +19,6 @@ jobs:
         arch: ["x86_64"]
 
     steps:
-      - name: Increase swap space
-        run: |
-          fallocate -l 32G /swapfile
-
       - name: Install Git
         run: |
           apt-get update
@@ -105,7 +101,7 @@ jobs:
             TARGET_ARCH=""
           fi
           # Configure Bazel for Lower Memory Usage
-          CUSTOM_BAZEL_FLAGS+="--linkopt=-fuse-ld=lld --local_ram_resources=4096 --jobs=2 --nouse_action_cache"
+          CUSTOM_BAZEL_FLAGS+="--linkopt=-fuse-ld=lld --local_ram_resources=2048 --jobs=2 --nouse_action_cache"
           
           # Export variables
           export PYTHON_VERSION="${{ matrix.python }}"

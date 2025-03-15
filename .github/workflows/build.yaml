@@ -19,6 +19,14 @@ jobs:
         arch: ["x86_64"]
 
     steps:
+      - name: Increase swap space
+        run: |
+          sudo fallocate -l 16G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+    
       - name: Install Git
         run: |
           apt-get update
@@ -85,14 +93,12 @@ jobs:
           set -xe
           source /tmp/tflite_env/bin/activate
           python --version        
-          export PYTHON_VERSION="${{ matrix.python }}"
-          export TF_PYTHON_VERSION="$PYTHON_VERSION"
-          export NUMPY_VERSION="1.24.4"
-          export TENSORFLOW_TARGET="${{ matrix.arch }}"
+
+          # Define flags
           CUSTOM_BAZEL_FLAGS="--define=tflite_pip_with_xnnpack=true --define=tflite_pip_with_xnnpack_reshaping=true "
           CUSTOM_BAZEL_FLAGS+="--define=tflite_pip_with_flex=true "
           CUSTOM_BAZEL_FLAGS+="--copt=-O3 --linkopt=-flto --copt=-flto --define=no_tensorflow_py_deps=true --strip=always "
-          CUSTOM_BAZEL_FLAGS+="--copt=-ffunction-sections --linkopt=-Wl,--gc-sections --copt=-DNDEBUG --copt=-fvisibility=hidden "
+          CUSTOM_BAZEL_FLAGS+="--copt=-ffunction-sections --linkopt=-Wl,--gc-sections --copt=-DNDEBUG --copt=-fvisibility=hidden --config=monolithic "
           CUSTOM_BAZEL_FLAGS+="--features=-layering_check "
           if [[ "${{ matrix.arch }}" == "aarch64" ]]; then
             TARGET_ARCH="aarch64"
@@ -102,10 +108,20 @@ jobs:
             CUSTOM_BAZEL_FLAGS+="--copt=-Wno-gnu-offsetof-extensions "
             TARGET_ARCH=""
           fi
+          # Configure Bazel for Lower Memory Usage
+          CUSTOM_BAZEL_FLAGS+="--linkopt=-fuse-ld=lld --local_ram_resources=4096 --jobs=2 --nouse_action_cache"
+          
+          # Export variables
+          export PYTHON_VERSION="${{ matrix.python }}"
+          export TF_PYTHON_VERSION="$PYTHON_VERSION"
+          export NUMPY_VERSION="1.24.4"
+          export TENSORFLOW_TARGET="${{ matrix.arch }}"
           export CUSTOM_BAZEL_FLAGS
           export TF_PYTHON_VERSION="${{ matrix.python }}"
           export CC=clang-17
           export CXX=clang++-17
+          export LDFLAGS="-fuse-ld=lld" # More efficient
+          
           # Insert a 'bazel clean --expunge' call before the script's normal Bazel commands
           sed -i "/^bazel/i\bazel clean --expunge || true" tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh
           chmod +x tensorflow/lite/tools/pip_package/build_pip_package_with_bazel.sh

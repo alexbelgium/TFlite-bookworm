@@ -101,7 +101,7 @@ jobs:
             TARGET_ARCH=""
           fi
           # Configure Bazel for Lower Memory Usage
-          CUSTOM_BAZEL_FLAGS+="--linkopt=-fuse-ld=lld --local_ram_resources=1024 --jobs=2 --nouse_action_cache "
+          CUSTOM_BAZEL_FLAGS+="--linkopt=-fuse-ld=lld --local_ram_resources=1024 --jobs=2 --discard_analysis_cache --nokeep_state_after_build --notrack_incremental_state "
           
           # Export variables
           export PYTHON_VERSION="${{ matrix.python }}"
